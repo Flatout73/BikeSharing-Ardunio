@@ -1,5 +1,4 @@
 #include <TroykaGPS.h>
-
 #include <SoftwareSerial.h>
 
 SoftwareSerial BTSerial(6, 3);
@@ -26,65 +25,33 @@ int solenoid=11;
 
 bool isOpen = false;
 
+String id = "0xFFE0";
+
 void setup() {
 
   pinMode(solenoid, OUTPUT);
   pinMode(switchReed, INPUT);
   
   Serial.begin(9600);
-  BTSerial.begin(9600);
   
-  while(!Serial || !BTSerial);
-  Serial.println("AT commands: okay");
-
   GPSSerial.begin(115200);
   Serial.println("GPS init is OK on speed 115200");
   GPSSerial.write("$PMTK251,9600*17\r\n");
   GPSSerial.end();
   GPSSerial.begin(9600);
   Serial.print("GPS init is OK on speed 9600\n");
+  
+  BTSerial.begin(9600);
+
+  while(!Serial || !BTSerial);
+    Serial.println("AT commands: okay");
 }
 
-void loop() {
-//  delay(500);
-//  digitalWrite(LED, LOW);
-//  delay(500);
-//  digitalWrite(LED, HIGH);
-
-//  digitalWrite(solenoid, HIGH);
-//  delay(2000);
-//  digitalWrite(solenoid, LOW);
-//  delay(1000);
-
-  
-  if(BTSerial.available()) {
-    Serial.println("BT avaliable");
-    String command = BTSerial.readString();
-    Serial.println(command);
-    if (command == "OPENLOCK") {
-        digitalWrite(solenoid, HIGH);
-        delay(2000);
-        digitalWrite(solenoid, LOW);
-        delay(10);
-    }
-  } else {
-     if (digitalRead(switchReed)==HIGH) {
-      if (isOpen) {
-          BTSerial.write("CLOSED");
-          isOpen = false;
-      }
-     } else {
-          BTSerial.write("OPENED");
-          Serial.println("Your Door is Open"); 
-          isOpen = true;
-     }
-  }
-
-  if(Serial.available())
-    BTSerial.write(Serial.read());
-
-      // если пришли данные с gps-модуля
-  if (gps.available()) {
+int counter = 30000;
+void sendGPS() {
+        // если пришли данные с gps-модуля
+  if (counter > 30000 && gps.available()) {
+    counter = 0;
     // считываем данные и парсим
     gps.readParsing();
     // проверяем состояние GPS-модуля
@@ -123,8 +90,8 @@ void loop() {
 //        coord.concat(gps.getLongitudeBase10());
 //        char array[100];
 //        coord.toCharArray(array, 100);
- //       BTSerial.print(coord);
-       // BTSerial.write(coor);
+//        BTSerial.print(coord);
+//        BTSerial.write(coor);
 
        BTSerial.print("COORDINATES: ");
        BTSerial.print(gps.getLatitudeBase10(), DEC);
@@ -138,14 +105,42 @@ void loop() {
         break;
       // нет соединение со спутниками
       case GPS_ERROR_SAT:
-        Serial.println("GPS no connect to satellites!!!");
-        
-       BTSerial.print("@COORD: ");
-       BTSerial.print(55.6778989, DEC);
-       BTSerial.print(" ");
-       BTSerial.print(34.6788777, DEC);
-       BTSerial.print("@");
+ //       Serial.println("GPS no connect to satellites!!!");
         break;
     }
+  } else {
+    counter++;
   }
+}
+
+void loop() {
+
+  BTSerial.listen();
+  if(BTSerial.available()) {
+    Serial.println("BT avaliable");
+    String command = BTSerial.readString();
+    Serial.println(command);
+    if (command == "OPENLOCK") {
+        digitalWrite(solenoid, HIGH);
+        delay(2000);
+        digitalWrite(solenoid, LOW);
+        delay(10);
+    }
+  } else {
+     if (digitalRead(switchReed)==HIGH) {
+      if (isOpen) {
+          BTSerial.write("CLOSED");
+          isOpen = false;
+      }
+     } else {
+          BTSerial.write("OPENED");
+          Serial.println("Your Door is Open"); 
+          isOpen = true;
+     }
+  }
+
+  if(Serial.available())
+    BTSerial.write(Serial.read());
+
+    sendGPS();
 }
